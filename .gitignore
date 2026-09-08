@@ -1,0 +1,9 @@
+node_modules/
+.env
+
+# Вся папка целиком — чтобы любой новый файл с секретами не уехал в репозиторий
+credentials/
+
+downloads/
+logs/
+.DS_Store
