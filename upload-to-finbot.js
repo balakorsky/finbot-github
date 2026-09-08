@@ -10,7 +10,7 @@ const { hashKey, loadSet, saveSet } = require('./state-store');
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 const UPLOADED_FILE = 'uploaded-files.json';
 
-const FINBOT_URL      = process.env.FINBOT_URL || 'https://brstrf.finbot.co.il/hs-user/';
+const FINBOT_URL      = process.env.FINBOT_URL;
 const FINBOT_USERNAME = process.env.FINBOT_USERNAME;
 const FINBOT_PASSWORD = process.env.FINBOT_PASSWORD;
 const HEADLESS        = process.env.HEADLESS !== 'false';
@@ -42,7 +42,7 @@ function getPdfFiles(folder) {
 }
 
 async function login(page) {
-  log(`Opening ${FINBOT_URL}`);
+  log('Opening FinBot');
   await page.goto(FINBOT_URL, { waitUntil: 'networkidle' });
 
   const usernameSelectors = [
@@ -131,16 +131,14 @@ async function uploadExpenses(page, pdfFiles) {
   log(`✅ ${pdfFiles.length} file(s) submitted to upload form`);
   await page.waitForTimeout(3000);
 
-  // Save screenshot as GitHub Actions artifact for manual verification
-  const screenshotPath = path.join(__dirname, 'logs', `upload-result-${Date.now()}.png`);
-  fs.mkdirSync(path.join(__dirname, 'logs'), { recursive: true });
-  await page.screenshot({ path: screenshotPath, fullPage: true });
-  log(`Screenshot saved: ${screenshotPath}`);
+  // Скриншот не делается намеренно.
+  // Полностраничный снимок авторизованного дашборда содержит финансовые данные
+  // и в публичном репозитории был бы доступен всем.
 }
 
 async function main() {
-  if (!FINBOT_USERNAME || !FINBOT_PASSWORD) {
-    console.error('❌ FINBOT_USERNAME / FINBOT_PASSWORD not set');
+  if (!FINBOT_USERNAME || !FINBOT_PASSWORD || !FINBOT_URL) {
+    console.error('❌ FINBOT_URL / FINBOT_USERNAME / FINBOT_PASSWORD not set');
     process.exit(1);
   }
 
@@ -164,7 +162,7 @@ async function main() {
     return;
   }
 
-  newFiles.forEach((f) => log(`  → ${path.basename(f)}`));
+  newFiles.forEach((f) => log(`  → ${hashKey(path.basename(f))}`));
 
   const browser = await chromium.launch({ headless: HEADLESS });
   const page = await browser.newPage();

@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
+const crypto = require('crypto');
 const { loadSet, saveSet } = require('./state-store');
 
 const CREDENTIALS_PATH = path.join(__dirname, 'credentials', 'client_secret.json');
@@ -95,7 +96,7 @@ async function fetchAttachmentsForSender(gmail, sender, targetDir, processedIds)
         const buffer = Buffer.from(att.data.data, 'base64');
         const filename = `${dateStr}_${sender.name}_${sanitizeFilename(subject)}_${sanitizeFilename(part.filename)}`;
         fs.writeFileSync(path.join(targetDir, filename), buffer);
-        log(`  ✅ Скачан: ${filename}`);
+        log(`  ✅ Скачан: ${sender.name} / ${crypto.createHash('sha256').update(filename).digest('hex').slice(0, 8)}`);
         saved++;
       }
 

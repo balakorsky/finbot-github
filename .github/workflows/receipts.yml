@@ -50,7 +50,7 @@ jobs:
       - name: Upload to FinBot
         run: node upload-to-finbot.js
         env:
-          FINBOT_URL: https://brstrf.finbot.co.il/hs-user/
+          FINBOT_URL: ${{ secrets.FINBOT_URL }}
           FINBOT_USERNAME: ${{ secrets.FINBOT_USERNAME }}
           FINBOT_PASSWORD: ${{ secrets.FINBOT_PASSWORD }}
           HEADLESS: 'true'
@@ -63,15 +63,6 @@ jobs:
           git diff --staged --quiet || git commit -m "chore: update deduplication state [skip ci]"
           git pull --rebase origin main
           git push
-
-      - name: Upload screenshot as artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: finbot-screenshot-${{ github.run_id }}
-          path: logs/upload-result-*.png
-          if-no-files-found: ignore
-          retention-days: 30
 
       - name: Notify Telegram — success
         if: success()
