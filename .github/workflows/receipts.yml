@@ -1,10 +1,13 @@
-name: Weekly Receipt Automation
+
+
+name: Daily Receipt Automation
 
 on:
   schedule:
-    # Каждую среду в 17:00 UTC = 20:00 Israel time (UTC+3)
-    - cron: '0 17 * * 3'
-  workflow_dispatch:  # Ручной запуск через GitHub UI → Actions → Run workflow
+    - cron: '0 19 * * *'
+      timezone: "Asia/Jerusalem"
+
+  workflow_dispatch:
 
 jobs:
   run:
