@@ -7,3 +7,4 @@ credentials/
 downloads/
 logs/
 .DS_Store
+run-finbot.sh

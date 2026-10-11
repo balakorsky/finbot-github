@@ -2,6 +2,8 @@
 // Logs into FinBot and uploads PDFs from downloads/<latest date>/.
 // Deduplication: already uploaded files are tracked in credentials/uploaded-files.json.
 
+require('dotenv').config();
+
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
