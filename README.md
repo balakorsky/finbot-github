@@ -227,7 +227,7 @@ Sends a Telegram notification
 
 The workflow can also be started manually from:
 
-GitHub → Actions → Weekly Receipt Automation → Run workflow
+GitHub → Actions → Daily Receipt Automation → Run workflow
 
 Required GitHub Secrets
 
