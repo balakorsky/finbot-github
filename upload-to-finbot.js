@@ -21,6 +21,11 @@ function log(msg) {
   console.log(`[${new Date().toISOString()}] ${msg}`);
 }
 
+// Passes a value to subsequent GitHub Actions steps (no-op locally).
+function setOutput(name, value) {
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `${name}=${value}\n`);
+}
+
 function loadUploadedKeys() {
   return loadSet(UPLOADED_FILE);
 }
@@ -176,6 +181,7 @@ async function main() {
     for (const f of newFiles) uploadedKeys.add(hashKey(path.basename(f)));
     saveUploadedKeys(uploadedKeys);
     log(`✅ Saved to uploaded-files.json: ${newFiles.length} file(s)`);
+    setOutput('uploaded', newFiles.length);
   } finally {
     await browser.close();
   }

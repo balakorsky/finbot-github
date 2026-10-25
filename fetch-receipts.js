@@ -32,6 +32,11 @@ function log(msg) {
   console.log(`[${new Date().toISOString()}] ${msg}`);
 }
 
+// Передаёт значение в следующие шаги GitHub Actions (локально — no-op).
+function setOutput(name, value) {
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `${name}=${value}\n`);
+}
+
 function getAuthClient() {
   const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
   const { client_secret, client_id, redirect_uris } = credentials.installed;
@@ -131,6 +136,7 @@ async function main() {
   }
 
   log(`=== Готово. Скачано новых файлов: ${total} → ${targetDir} ===`);
+  setOutput('downloaded', total);
 
   if (total === 0) {
     try { fs.rmdirSync(targetDir); } catch {}

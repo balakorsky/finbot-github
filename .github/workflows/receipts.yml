@@ -48,9 +48,11 @@ jobs:
           node -e "JSON.parse(require('fs').readFileSync('credentials/token.json','utf8')); console.log('token OK')"
 
       - name: Fetch receipts from Gmail
+        id: fetch
         run: node fetch-receipts.js
 
       - name: Upload to FinBot
+        id: upload
         run: node upload-to-finbot.js
         env:
           FINBOT_URL: ${{ secrets.FINBOT_URL }}
@@ -69,10 +71,18 @@ jobs:
 
       - name: Notify Telegram — success
         if: success()
+        env:
+          DOWNLOADED: ${{ steps.fetch.outputs.downloaded || 0 }}
+          UPLOADED: ${{ steps.upload.outputs.uploaded || 0 }}
         run: |
+          if [ "$DOWNLOADED" -eq 0 ] && [ "$UPLOADED" -eq 0 ]; then
+            TEXT="ℹ️ FinBot: новых квитанций нет — ничего не скачано и не загружено."
+          else
+            TEXT="✅ FinBot: скачано файлов: $DOWNLOADED, загружено в FinBot: $UPLOADED."
+          fi
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
             -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-            --data-urlencode "text=✅ FinBot: квитанции успешно скачаны и загружены."
+            --data-urlencode "text=$TEXT"
 
       - name: Notify Telegram — failure
         if: failure()
