@@ -24,6 +24,7 @@ const SENDERS = [
   { name: 'ChatbotApp',     query: 'from:paddle.com subject:"CHATBOT APP"' },
   { name: 'Partner',        query: 'from:Thankyou@partner.net.il' },
   { name: 'GoTo',           query: 'from:noreply.il@gotoglobal.com' },
+  { name: 'IEC',            query: 'from:noreplys@dpd.iec.co.il' },
 ];
 
 const YEAR_START = `${new Date().getFullYear()}/01/01`;
