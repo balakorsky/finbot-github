@@ -1,5 +1,7 @@
 require('dotenv').config({ quiet: true });
 
+const fs = require('fs');
+const path = require('path');
 const { chromium } = require('playwright');
 
 async function main() {
@@ -54,14 +56,65 @@ async function main() {
       .then(() => true)
       .catch(() => false);
 
-    console.log(`URL after login: ${page.url()}`);
+    const currentUrl = page.url();
+
+    console.log(`URL after login: ${currentUrl}`);
 
     if (loggedIn) {
       console.log('✅ FINBOT LOGIN OK');
       return;
     }
 
-    console.error('❌ FINBOT LOGIN FAILED');
+    throw new Error(`FinBot login failed. Current URL: ${currentUrl}`);
+
+  } catch (err) {
+    // logs/ is in .gitignore, so the saved page never reaches the repo
+    const logsDir = path.join(__dirname, 'logs');
+
+    fs.mkdirSync(logsDir, {
+      recursive: true,
+    });
+
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, '-');
+
+    const htmlPath = path.join(
+      logsDir,
+      `finbot-login-error-${timestamp}.html`
+    );
+
+    const errorPath = path.join(
+      logsDir,
+      `finbot-login-error-${timestamp}.txt`
+    );
+
+    try {
+      const html = await page.content();
+      fs.writeFileSync(htmlPath, html, 'utf8');
+
+      console.error(`HTML saved: ${htmlPath}`);
+    } catch (htmlError) {
+      console.error(
+        `Could not save HTML: ${htmlError.message}`
+      );
+    }
+
+    const errorText = [
+      `Time: ${new Date().toISOString()}`,
+      `URL: ${page.url()}`,
+      `Error: ${err.message}`,
+    ].join('\n');
+
+    fs.writeFileSync(
+      errorPath,
+      errorText,
+      'utf8'
+    );
+
+    console.error(`Error log saved: ${errorPath}`);
+    console.error(`❌ ERROR: ${err.message}`);
+
     process.exitCode = 1;
 
   } finally {
@@ -78,6 +131,6 @@ async function waitForElement(locator, errorMessage) {
 }
 
 main().catch((err) => {
-  console.error(`❌ ERROR: ${err.message}`);
+  console.error(`❌ FATAL ERROR: ${err.message}`);
   process.exit(1);
 });
