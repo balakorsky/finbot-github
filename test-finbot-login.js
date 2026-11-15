@@ -7,6 +7,7 @@ async function main() {
     FINBOT_URL,
     FINBOT_USERNAME,
     FINBOT_PASSWORD,
+    HEADLESS,
   } = process.env;
 
   if (!FINBOT_URL || !FINBOT_USERNAME || !FINBOT_PASSWORD) {
@@ -15,46 +16,64 @@ async function main() {
     );
   }
 
+  // HEADLESS=false -> browser visible
+  // anything else -> headless
+  const headless = HEADLESS !== 'false';
+
+  console.log(`Browser mode: ${headless ? 'HEADLESS' : 'HEADED'}`);
+  console.log('Opening FinBot...');
+
   const browser = await chromium.launch({
-    headless: false,
+    headless,
   });
 
   const page = await browser.newPage();
 
   try {
-    console.log('Opening FinBot...');
-
     await page.goto(FINBOT_URL, {
       waitUntil: 'networkidle',
+      timeout: 30000,
     });
 
-    await page
-      .locator('input[name="email"]')
-      .fill(FINBOT_USERNAME);
+    const usernameField = page.locator('input[name="email"]').first();
+    const passwordField = page.locator('input[name="password"]').first();
+    const loginButton = page.locator('button[type="submit"]').first();
 
-    await page
-      .locator('input[name="password"]')
-      .fill(FINBOT_PASSWORD);
+    // waitFor() waits for the element to render, unlike count()
+    await waitForElement(usernameField, 'Username field not found');
+    await waitForElement(passwordField, 'Password field not found');
+    await waitForElement(loginButton, 'Login button not found');
 
-    await page
-      .locator('button[type="submit"]')
-      .click();
+    await usernameField.fill(FINBOT_USERNAME);
+    await passwordField.fill(FINBOT_PASSWORD);
 
-    await page.waitForTimeout(5000);
+    await loginButton.click();
 
-    const currentUrl = page.url();
+    const loggedIn = await page
+      .waitForURL(/dashboard/, { timeout: 20000 })
+      .then(() => true)
+      .catch(() => false);
 
-    console.log(`URL after login: ${currentUrl}`);
+    console.log(`URL after login: ${page.url()}`);
 
-    if (currentUrl.includes('dashboard')) {
+    if (loggedIn) {
       console.log('✅ FINBOT LOGIN OK');
       return;
     }
 
-    console.log('❌ FINBOT LOGIN FAILED');
+    console.error('❌ FINBOT LOGIN FAILED');
     process.exitCode = 1;
+
   } finally {
     await browser.close();
+  }
+}
+
+async function waitForElement(locator, errorMessage) {
+  try {
+    await locator.waitFor({ state: 'visible', timeout: 10000 });
+  } catch {
+    throw new Error(errorMessage);
   }
 }
 
