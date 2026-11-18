@@ -21,7 +21,9 @@ const SENDERS = [
   { name: 'Kvish6',         query: 'from:6cn.co.il' },
   { name: 'Anthropic',      query: 'from:mail.anthropic.com' },
   { name: 'GooglePlay',     query: 'from:googleplay-noreply@google.com' },
-  { name: 'ChatbotApp',     query: 'from:paddle.com subject:"CHATBOT APP"' },
+  // С сентября 2026 тема письма сменилась на "Payment confirmed"
+  { name: 'ChatbotApp',     query: 'from:help@paddle.com (subject:"CHATBOT APP" OR subject:"Payment confirmed")',
+    pdfFilter: /invoice/i },
   { name: 'Partner',        query: 'from:Thankyou@partner.net.il' },
   { name: 'GoTo',           query: 'from:noreply.il@gotoglobal.com' },
   { name: 'IEC',            query: 'from:noreplys@dpd.iec.co.il' },
@@ -95,6 +97,7 @@ async function fetchAttachmentsForSender(gmail, sender, targetDir, processedIds)
       for (const part of parts) {
         if (!part.filename || !part.body?.attachmentId) continue;
         if (!part.filename.toLowerCase().endsWith('.pdf')) continue;
+        if (sender.pdfFilter && !sender.pdfFilter.test(part.filename)) continue;
 
         const att = await gmail.users.messages.attachments.get({
           userId: 'me', messageId: msgMeta.id, id: part.body.attachmentId,
