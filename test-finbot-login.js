@@ -4,6 +4,61 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 
+// Checked in order: "locked" messages often also mention invalid attempts,
+// so ACCOUNT_LOCKED must win over WRONG_CREDENTIALS.
+const ERROR_PATTERNS = [
+  {
+    type: 'ACCOUNT_LOCKED',
+    patterns: [
+      /locked/i, /blocked/i, /suspended/i, /too many/i,
+      /חסום/, /נחסם/, /נעול/, /יותר מדי ניסיונות/,
+    ],
+  },
+  {
+    type: 'SERVER_ERROR',
+    patterns: [
+      /server error/i, /internal error/i, /try again later/i,
+      /שגיאת שרת/, /תקלה/, /נסה שוב מאוחר יותר/, /נסו שוב מאוחר יותר/,
+    ],
+  },
+  {
+    type: 'WRONG_CREDENTIALS',
+    patterns: [
+      /wrong/i, /incorrect/i, /invalid/i, /not match/i,
+      /שגוי/, /לא נכונ/, /אינ\S* נכונ/, /לא תקינ/, /לא קיים/,
+    ],
+  },
+];
+
+const ERROR_HINTS = {
+  WRONG_CREDENTIALS: 'Check FINBOT_USERNAME / FINBOT_PASSWORD in .env',
+  ACCOUNT_LOCKED: 'Do NOT retry - unlock the account in FinBot first',
+  SERVER_ERROR: 'FinBot is having problems - try again later',
+  UNKNOWN: 'Check the saved HTML in logs/',
+};
+
+const EXIT_CODES = {
+  UNKNOWN: 1,
+  WRONG_CREDENTIALS: 2,
+  ACCOUNT_LOCKED: 3,
+  SERVER_ERROR: 4,
+};
+
+function classifyLoginError({ messages = [], httpStatus = null, errorMessage = '' }) {
+  if (httpStatus >= 500) return 'SERVER_ERROR';
+
+  // Site unreachable / not responding
+  if (/net::ERR_|Timeout .*exceeded/.test(errorMessage)) return 'SERVER_ERROR';
+
+  const text = messages.join(' ');
+
+  for (const { type, patterns } of ERROR_PATTERNS) {
+    if (patterns.some((pattern) => pattern.test(text))) return type;
+  }
+
+  return 'UNKNOWN';
+}
+
 async function getLoginErrorText(page) {
   const errorSelectors = [
     '[role="alert"]',
@@ -82,6 +137,22 @@ async function main() {
 
   const page = await browser.newPage();
 
+  // Remember 5xx answers from FinBot itself (pages and API calls, not CDN assets)
+  const finbotHost = new URL(FINBOT_URL).host;
+  let serverErrorStatus = null;
+
+  page.on('response', (response) => {
+    const isFinbot = new URL(response.url()).host === finbotHost;
+    const isPageOrApi = ['document', 'xhr', 'fetch']
+      .includes(response.request().resourceType());
+
+    if (isFinbot && isPageOrApi && response.status() >= 500) {
+      serverErrorStatus = response.status();
+    }
+  });
+
+  let loginErrors = [];
+
   try {
     await page.goto(FINBOT_URL, {
       waitUntil: 'networkidle',
@@ -124,7 +195,7 @@ async function main() {
       return;
     }
 
-    const loginErrors = await getLoginErrorText(page);
+    loginErrors = await getLoginErrorText(page);
 
     if (loginErrors.length > 0) {
       console.error('FinBot login message:');
@@ -146,6 +217,12 @@ async function main() {
     throw new Error(errorMessage);
 
   } catch (err) {
+    const errorType = classifyLoginError({
+      messages: loginErrors,
+      httpStatus: serverErrorStatus,
+      errorMessage: err.message,
+    });
+
     // logs/ is in .gitignore, so the saved page never reaches the repo
     const logsDir = path.join(__dirname, 'logs');
 
@@ -191,6 +268,8 @@ async function main() {
     const errorText = [
       `Time: ${new Date().toISOString()}`,
       `URL: ${page.url()}`,
+      `Type: ${errorType}`,
+      `HTTP 5xx: ${serverErrorStatus ?? 'none'}`,
       `Error: ${err.message}`,
     ].join('\n');
 
@@ -202,18 +281,24 @@ async function main() {
 
     console.error(`Error log saved: ${errorPath}`);
     console.error(`❌ ERROR: ${err.message}`);
+    console.error(`❌ TYPE: ${errorType} — ${ERROR_HINTS[errorType]}`);
 
-    process.exitCode = 1;
+    process.exitCode = EXIT_CODES[errorType];
 
   } finally {
     await browser.close();
   }
 }
 
-main().catch((err) => {
-  console.error(
-    `❌ FATAL ERROR: ${err.message}`
-  );
+// Run only via "node test-finbot-login.js"; require() just exposes the classifier
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(
+      `❌ FATAL ERROR: ${err.message}`
+    );
 
-  process.exit(1);
-});
+    process.exit(1);
+  });
+}
+
+module.exports = { classifyLoginError };
